@@ -9,11 +9,11 @@ import json
 from typing import List, Tuple
 import math
 import threading
+from rclpy.node import Node
 
-class EnhancedPathTracker:
+class EnhancedPathTracker(Node):
     def __init__(self, namespace=''):
-        rclpy.init()
-        self.node = rclpy.create_node('enhanced_path_tracker')
+        super().__init__('enhanced_path_tracker')
         self.path_points: List[Tuple[float, float]] = []
         self.timestamps: List[float] = []
         self.start_time = None
@@ -24,7 +24,7 @@ class EnhancedPathTracker:
         self.grid_cells = (4, 4)  # 4x4 grid
         
         # Subscribe to odometry
-        self.odom_sub = self.node.create_subscription(
+        self.odom_sub = self.create_subscription(
             Odometry,
             f'{namespace}/odom',
             self.odom_callback,
@@ -77,9 +77,6 @@ class EnhancedPathTracker:
     
     def setup_grid(self):
         """Draw the 4x4 grid overlay"""
-        # Convert feet to meters for internal calculations
-        FOOT_TO_METER = 0.3048
-        
         # Draw vertical grid lines
         for i in range(5):  # 0 to 4 for 4x4 grid
             x = i
@@ -91,7 +88,6 @@ class EnhancedPathTracker:
             self.ax.axhline(y=y, color='gray', linestyle='-', alpha=0.5)
     
     def calculate_statistics(self) -> dict:
-        """Calculate various path statistics"""
         if not self.path_points:
             return {}
         
@@ -129,7 +125,7 @@ class EnhancedPathTracker:
         y_feet = y_meters * METER_TO_FOOT
         
         current_pos = (x_feet, y_feet)
-        current_time = self.node.get_clock().now().nanoseconds / 1e9
+        current_time = self.get_clock().now().nanoseconds / 1e9
         
         if self.start_time is None:
             self.start_time = current_time
@@ -195,23 +191,5 @@ class EnhancedPathTracker:
         print(f"Saved:\n- Path data: {filename}.csv\n- Statistics: {filename}_stats.json")
         print(f"- Plots: {filename}.png and {filename}.pdf")
 
-def run_tracking_thread(namespace=''):
-    tracker = EnhancedPathTracker(namespace)
-    try:
-        while rclpy.ok():
-            rclpy.spin_once(tracker.node)
-    except KeyboardInterrupt:
-        print("\nSaving path data before exit...")
-        tracker.save_to_file()
-    finally:
-        tracker.node.destroy_node()
-        rclpy.shutdown()
-        plt.close()
-
-if __name__ == '__main__':
-    import sys
-    namespace = f'{sys.argv[1]}' if len(sys.argv) >= 2 else ''
-    
-    # If running standalone
-    tracker = EnhancedPathTracker(namespace)
-    tracker.run()
+def create_path_tracker(namespace=''):
+    return EnhancedPathTracker(namespace)
