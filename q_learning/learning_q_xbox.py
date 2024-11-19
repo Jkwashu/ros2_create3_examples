@@ -17,10 +17,13 @@ def forward_turning(forward_velocity, turn_velocity):
     t.angular.z = turn_velocity
     return t
 
-
 class QDemoNode(QNodeTemplate):
     def __init__(self, namespace, msg_queue, x_meters, x_squares, y_meters, y_squares):
-        super().__init__('learning_q_xbox', namespace, runner.turn_twist(0.5, -math.pi / 4), runner.straight_twist(0.5), runner.turn_twist(0.5, math.pi / 4))
+        # Modified to only pass velocity to turn_twist, since that's what the function accepts
+        super().__init__('learning_q_xbox', namespace, 
+                        runner.turn_twist(-math.pi/8),  # Reduced turn rate for stability
+                        runner.straight_twist(0.5), 
+                        runner.turn_twist(math.pi/8))   # Reduced turn rate for stability
         self.odometry = self.create_subscription(Odometry, namespace + '/odom', self.odom_callback, qos_profile_sensor_data)        
         self.x_meters = x_meters
         self.y_meters = y_meters
@@ -58,7 +61,6 @@ class QDemoNode(QNodeTemplate):
         if not (0 <= self.state < self.num_squares()):
             self.state = self.out_of_bounds_state()
 
-
 class XBoxReader:
     def __init__(self, msg_queue, incoming):
         self.msg_queue = msg_queue
@@ -75,8 +77,6 @@ class XBoxReader:
             if not self.incoming.empty():
                 print("got message")
                 break
-
-
 
 if __name__ == '__main__':
     rclpy.init()
