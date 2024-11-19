@@ -79,7 +79,10 @@ class XBoxReader:
                 break
 
 if __name__ == '__main__':
-    rclpy.init()
+    import sys
+    import threading
+    from path_tracker import run_tracking_thread  # Import the tracking function
+    
     namespace = f'{sys.argv[1]}' if len(sys.argv) >= 2 else ''
     params = QParameters()
     params.epsilon = 0.05
@@ -87,7 +90,12 @@ if __name__ == '__main__':
     to_x = Queue()
     xboxer = XBoxReader(from_x, to_x)
 
-    demo_node = QDemoNode(namespace, from_x, x_meters=3.0, y_meters=2.0, x_squares=10, y_squares=12)
+    # Create and start the path tracking thread
+    tracking_thread = threading.Thread(target=run_tracking_thread, args=(namespace,))
+    tracking_thread.start()
+
+    # Start the Q-learning process
+    demo_node = QDemoNode(namespace, from_x, x_meters=1.2192, y_meters=1.2192, x_squares=4, y_squares=4)  # 4 feet = 1.2192 meters
     main_node = QBot(demo_node, params)
     xbox_thread = threading.Thread(target=lambda x: x.loop(), args=(xboxer,))
     xbox_thread.start()
@@ -95,3 +103,6 @@ if __name__ == '__main__':
     print("Runner done")
     main_node.print_status()
     to_x.put("QUIT")
+    
+    # Wait for the tracking thread to finish
+    tracking_thread.join()
