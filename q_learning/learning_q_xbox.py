@@ -82,7 +82,7 @@ if __name__ == '__main__':
     import sys
     from path_tracker import create_path_tracker
     
-    rclpy.init()  # Initialize rclpy once
+    rclpy.init()
     
     namespace = f'{sys.argv[1]}' if len(sys.argv) >= 2 else ''
     params = QParameters()
@@ -91,18 +91,16 @@ if __name__ == '__main__':
     to_x = Queue()
     xboxer = XBoxReader(from_x, to_x)
 
-    # Create the path tracker node
+    # Create nodes
     tracker = create_path_tracker(namespace)
-    
-    # Create the Q-learning node
-    demo_node = QDemoNode(namespace, from_x, x_meters=1.2192, y_meters=1.2192, x_squares=4, y_squares=4)  # 4 feet = 1.2192 meters
+    demo_node = QDemoNode(namespace, from_x, x_meters=1.2192, y_meters=1.2192, x_squares=4, y_squares=4)
     main_node = QBot(demo_node, params)
     
-    # Create and start the xbox thread
+    # Start Xbox thread
     xbox_thread = threading.Thread(target=lambda x: x.loop(), args=(xboxer,))
     xbox_thread.start()
     
-    # Create an executor that will handle both nodes
+    # Create executor
     executor = rclpy.executors.MultiThreadedExecutor()
     executor.add_node(tracker)
     executor.add_node(main_node)
@@ -110,11 +108,24 @@ if __name__ == '__main__':
     try:
         executor.spin()
     except KeyboardInterrupt:
-        print("\nSaving path data before exit...")
-        tracker.save_to_file()
+        print("\nShutting down...")
     finally:
-        to_x.put("QUIT")
-        main_node.destroy_node()
-        tracker.destroy_node()
-        rclpy.shutdown()
-        plt.close()
+        # Save data first
+        try:
+            tracker.save_to_file()
+        except Exception as e:
+            print(f"Error saving path data: {e}")
+        
+        # Clean up
+        try:
+            to_x.put("QUIT")
+            main_node.destroy_node()
+            tracker.destroy_node()
+            plt.close('all')
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+        
+        try:
+            rclpy.shutdown()
+        except Exception as e:
+            print(f"Error during rclpy shutdown: {e}")
