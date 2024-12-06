@@ -69,6 +69,7 @@ class XBoxReader:
     def loop(self):
         dev = InputDevice('/dev/input/event0')
         for event in dev.read_loop():
+            print(f"event: {event}")
             if event.value == 1:
                 if event.code == 304:
                     self.msg_queue.put("A")
@@ -96,13 +97,8 @@ class LearningQXboxNode(runner.HdxNode):
         self.main_node = QBot(self.demo_node, params)
         
         # Add child nodes
-        self.add_child_nodes(self.main_node)
-        self.main_node.add_child_nodes(self.tracker)  # Add tracker as child of main_node
+        self.add_child_nodes(self.main_node, self.tracker)
         
-        # Start Xbox thread
-        self.xbox_thread = threading.Thread(target=lambda x: x.loop(), args=(self.xboxer,))
-        self.xbox_thread.start()
-
     def quit(self):
         print("\nSaving path data before exit...")
         try:
@@ -117,9 +113,25 @@ class LearningQXboxNode(runner.HdxNode):
         
         super().quit()
 
+
+def run_recursive_node(recursive_node):
+    executor = rclpy.executors.MultiThreadedExecutor()
+    recursive_node.add_self_recursive(executor)
+    xbox_thread = threading.Thread(target=lambda x: x.loop(), args=(recursive_node.xboxer,))
+    xbox_thread.start()
+    executor_thread = threading.Thread(target=executor.spin, daemon=True)
+    executor_thread.start()
+    user = input("Type anything to exit")
+    recursive_node.quit()
+    rclpy.shutdown()
+    executor_thread.join()
+    xbox_thread.join()
+
+
+
 if __name__ == '__main__':
     rclpy.init()
     namespace = f'{sys.argv[1]}' if len(sys.argv) >= 2 else ''
     
     bot = LearningQXboxNode(namespace)
-    runner.run_recursive_node(bot)
+    run_recursive_node(bot)

@@ -101,6 +101,7 @@ class EnhancedPathTracker(Node):
             
             # Update path and timestamps
             self.path_points.append(current_pos)
+            print("YO: {current_pos}")
             self.timestamps.append(current_time - self.start_time)
             
             # Update total distance
@@ -114,6 +115,7 @@ class EnhancedPathTracker(Node):
             # Update plot
             self.update_plot()
         except Exception as e:
+            print("EXCEPTION!!!!! {str(e)}")
             self.get_logger().error(f'Error in odom_callback: {str(e)}')
     
     def update_plot(self):
