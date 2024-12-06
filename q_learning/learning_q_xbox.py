@@ -10,6 +10,7 @@ from evdev import InputDevice
 from nav_msgs.msg import Odometry
 from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import Twist
+from path_tracker import create_path_tracker
 
 def forward_turning(forward_velocity, turn_velocity):
     t = Twist()
@@ -19,11 +20,10 @@ def forward_turning(forward_velocity, turn_velocity):
 
 class QDemoNode(QNodeTemplate):
     def __init__(self, namespace, msg_queue, x_meters, x_squares, y_meters, y_squares):
-        # Modified to only pass velocity to turn_twist, since that's what the function accepts
         super().__init__('learning_q_xbox', namespace, 
-                        runner.turn_twist(-math.pi/8),  # Reduced turn rate for stability
+                        runner.turn_twist(-math.pi/8),
                         runner.straight_twist(0.5), 
-                        runner.turn_twist(math.pi/8))   # Reduced turn rate for stability
+                        runner.turn_twist(math.pi/8))
         self.odometry = self.create_subscription(Odometry, namespace + '/odom', self.odom_callback, qos_profile_sensor_data)        
         self.x_meters = x_meters
         self.y_meters = y_meters
@@ -78,54 +78,47 @@ class XBoxReader:
                 print("got message")
                 break
 
-if __name__ == '__main__':
-    import sys
-    from path_tracker import create_path_tracker
-    
-    rclpy.init()
-    
-    namespace = f'{sys.argv[1]}' if len(sys.argv) >= 2 else ''
-    params = QParameters()
-    params.epsilon = 0.05
-    from_x = Queue()
-    to_x = Queue()
-    xboxer = XBoxReader(from_x, to_x)
+class LearningQXboxNode(runner.HdxNode):
+    def __init__(self, namespace):
+        super().__init__('learning_q_xbox_node', namespace)
+        self.from_x = Queue()
+        self.to_x = Queue()
+        self.xboxer = XBoxReader(self.from_x, self.to_x)
+        
+        # Create nodes
+        self.tracker = create_path_tracker(namespace)
+        self.demo_node = QDemoNode(namespace, self.from_x, 
+                                 x_meters=1.2192, y_meters=1.2192,  # 4 feet = 1.2192 meters
+                                 x_squares=4, y_squares=4)
+        
+        params = QParameters()
+        params.epsilon = 0.05
+        self.main_node = QBot(self.demo_node, params)
+        
+        # Add child nodes
+        self.add_child_nodes(self.tracker, self.main_node)
+        
+        # Start Xbox thread
+        self.xbox_thread = threading.Thread(target=lambda x: x.loop(), args=(self.xboxer,))
+        self.xbox_thread.start()
 
-    # Create nodes
-    tracker = create_path_tracker(namespace)
-    demo_node = QDemoNode(namespace, from_x, x_meters=1.2192, y_meters=1.2192, x_squares=4, y_squares=4)
-    main_node = QBot(demo_node, params)
-    
-    # Start Xbox thread
-    xbox_thread = threading.Thread(target=lambda x: x.loop(), args=(xboxer,))
-    xbox_thread.start()
-    
-    # Create executor
-    executor = rclpy.executors.MultiThreadedExecutor()
-    executor.add_node(tracker)
-    executor.add_node(main_node)
-    
-    try:
-        executor.spin()
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-    finally:
-        # Save data first
+    def quit(self):
+        print("\nSaving path data before exit...")
         try:
-            tracker.save_to_file()
+            self.tracker.save_to_file()
         except Exception as e:
             print(f"Error saving path data: {e}")
         
-        # Clean up
         try:
-            to_x.put("QUIT")
-            main_node.destroy_node()
-            tracker.destroy_node()
-            plt.close('all')
+            self.to_x.put("QUIT")
         except Exception as e:
-            print(f"Error during cleanup: {e}")
+            print(f"Error sending quit signal: {e}")
         
-        try:
-            rclpy.shutdown()
-        except Exception as e:
-            print(f"Error during rclpy shutdown: {e}")
+        super().quit()
+
+if __name__ == '__main__':
+    rclpy.init()
+    namespace = f'{sys.argv[1]}' if len(sys.argv) >= 2 else ''
+    
+    bot = LearningQXboxNode(namespace)
+    runner.run_recursive_node(bot)
