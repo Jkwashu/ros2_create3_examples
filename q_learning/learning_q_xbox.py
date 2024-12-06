@@ -96,7 +96,8 @@ class LearningQXboxNode(runner.HdxNode):
         self.main_node = QBot(self.demo_node, params)
         
         # Add child nodes
-        self.add_child_nodes(self.tracker, self.main_node)
+        self.add_child_nodes(self.main_node)
+        self.main_node.add_child_nodes(self.tracker)  # Add tracker as child of main_node
         
         # Start Xbox thread
         self.xbox_thread = threading.Thread(target=lambda x: x.loop(), args=(self.xboxer,))

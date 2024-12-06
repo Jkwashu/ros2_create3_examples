@@ -19,7 +19,8 @@ class EnhancedPathTracker(Node):
         self.path_points: List[Tuple[float, float]] = []
         self.timestamps: List[float] = []
         self.start_time = None
-        self.lock = threading.Lock()  # Add thread lock for matplotlib operations
+        self.lock = threading.Lock()
+        self.child_nodes = []  # Added this for recursive node structure
         
         # Configure for 4x4 foot grid
         FOOT_TO_METER = 0.3048
@@ -42,6 +43,19 @@ class EnhancedPathTracker(Node):
         
         # Initialize plot
         self.setup_plot()
+    
+    def add_self_recursive(self, executor):
+        """Add this node and all child nodes recursively to the executor"""
+        executor.add_node(self)
+        for child in self.child_nodes:
+            if hasattr(child, 'add_self_recursive'):
+                child.add_self_recursive(executor)
+            else:
+                executor.add_node(child)
+
+    def add_child_nodes(self, *children):
+        """Add child nodes to this node"""
+        self.child_nodes.extend(children)
     
     def setup_plot(self):
         with self.lock:
