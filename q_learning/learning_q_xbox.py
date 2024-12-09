@@ -67,7 +67,7 @@ class XBoxReader:
         self.incoming = incoming
 
     def loop(self):
-        dev = InputDevice('/dev/input/event0')
+        dev = InputDevice('/dev/input/event2')
         for event in dev.read_loop():
             print(f"event: {event}")
             if event.value == 1:
