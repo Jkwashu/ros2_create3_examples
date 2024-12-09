@@ -4,7 +4,7 @@
 # Also, sometimes you just have to reboot.
 
 from evdev import InputDevice, categorize, ecodes
-dev = InputDevice('/dev/input/event0')
+dev = InputDevice('/dev/input/event1')
 
 print(dev)
 
