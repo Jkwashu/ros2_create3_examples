@@ -47,7 +47,7 @@ class QDemoNode(QNodeTemplate):
         if state == self.out_of_bounds_state():
             return -100
         elif self.last_cmd == 'A':
-            return 10
+            return 30
         elif self.last_cmd == 'B':
             return -10
         else:
